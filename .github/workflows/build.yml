@@ -166,7 +166,7 @@ jobs:
         run: |
           if [ "${{ matrix.container }}" != "" ]; then
             python3 -m venv venv
-            source venv/bin/activate
+            . venv/bin/activate
           fi
           python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller browser-cookie3
 
@@ -178,7 +178,7 @@ jobs:
       - name: Build
         run: |
           if [ "${{ matrix.container }}" != "" ]; then
-            source venv/bin/activate
+            . venv/bin/activate
           fi
           python3 -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
 
