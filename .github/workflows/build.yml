@@ -17,80 +17,68 @@ jobs:
     name: 🪟 Windows Build
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install yt-dlp PyQt6 imageio-ffmpeg browser-cookie3 pyinstaller
+        run: pip install yt-dlp PyQt6 imageio-ffmpeg browser-cookie3 pyinstaller
         shell: pwsh
 
-      - name: Download Deno (Windows)
+      - name: Download Deno
+        shell: pwsh
         run: |
           Invoke-WebRequest -Uri "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip" -OutFile deno.zip
           Expand-Archive deno.zip -DestinationPath .
           Remove-Item deno.zip
-        shell: pwsh
 
-      - name: Build GrabWave.exe
+      - name: Build
+        shell: pwsh
         run: pyinstaller build/GrabWave.spec --distpath dist --workpath build\_work
-        shell: pwsh
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: GrabWave-Windows
           path: dist/GrabWave.exe
 
   # ─────────────────────────────────────────────
-  #  macOS → GrabWave (Intel + Apple Silicon)
+  #  macOS → Intel + Apple Silicon
   # ─────────────────────────────────────────────
   build-macos:
-    name: 🍎 macOS Build (${{ matrix.arch }})
+    name: 🍎 macOS (${{ matrix.suffix }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - arch: Intel (x86_64)
-            runner: macos-13
-            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip
+          - runner: macos-13
             suffix: mac-intel
-          - arch: Apple Silicon (ARM64)
-            runner: macos-latest
-            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip
+          - runner: macos-latest
             suffix: mac-arm64
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller
+        run: pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller
 
-      - name: Download Deno (macOS ${{ matrix.arch }})
+      - name: Download Deno
         run: |
           curl -fsSL "${{ matrix.deno_url }}" -o deno.zip
           unzip deno.zip && rm deno.zip && chmod +x deno
 
-      - name: Build GrabWave
+      - name: Build
         run: pyinstaller build/GrabWave.spec --distpath dist --workpath build/_work
 
-      - name: Rename binary
+      - name: Rename
         run: mv dist/GrabWave dist/GrabWave-${{ matrix.suffix }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: GrabWave-${{ matrix.suffix }}
           path: dist/GrabWave-${{ matrix.suffix }}
@@ -99,7 +87,7 @@ jobs:
   #  LINUX — матрица дистрибутивов
   # ─────────────────────────────────────────────
   build-linux:
-    name: 🐧 Linux Build (${{ matrix.name }})
+    name: 🐧 Linux (${{ matrix.suffix }})
     runs-on: ${{ matrix.runner }}
     container: ${{ matrix.container || '' }}
     strategy:
@@ -107,39 +95,36 @@ jobs:
       matrix:
         include:
 
-          # ── Ubuntu/Debian/Mint ──
-          - name: Ubuntu-Debian
-            runner: ubuntu-22.04
+          # Ubuntu/Debian/Mint
+          - runner: ubuntu-22.04
             container: ''
             suffix: linux-ubuntu
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # ── Максимальная совместимость: glibc 2.17+ ──
-          - name: Manylinux (glibc 2.17+)
-            runner: ubuntu-22.04
-            container: quay.io/pypa/manylinux2014_x86_64
+          # Максимальная совместимость glibc 2.28+
+          # (manylinux_2_28 = RHEL8 base, поддерживает Node.js 20 в actions)
+          - runner: ubuntu-22.04
+            container: quay.io/pypa/manylinux_2_28_x86_64
             suffix: linux-manylinux
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # ── Fedora / RPM ──
-          - name: Fedora
-            runner: ubuntu-22.04
+          # Fedora
+          - runner: ubuntu-22.04
             container: fedora:39
             suffix: linux-fedora
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # ── ARM64 ──
-          - name: Linux ARM64
-            runner: ubuntu-22.04-arm
+          # ARM64
+          - runner: ubuntu-22.04-arm
             container: ''
             suffix: linux-arm64
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-unknown-linux-gnu.zip
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install system deps (Ubuntu/ARM — apt)
+      # Ubuntu / ARM64 — apt
+      - name: Deps (apt)
         if: matrix.container == ''
         run: |
           sudo apt-get update -qq
@@ -148,42 +133,54 @@ jobs:
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
             libxcb-xinerama0 unzip curl
 
-      - name: Install system deps (Manylinux — yum)
-        if: matrix.container == 'quay.io/pypa/manylinux2014_x86_64'
+      # ARM64: PyQt6 не имеет готовых wheel — ставим из системного репо
+      - name: Qt6 for ARM64
+        if: matrix.suffix == 'linux-arm64'
+        run: |
+          sudo apt-get install -y python3-pyqt6 python3-pyqt6.sip qt6-base-dev
+
+      # Manylinux — yum
+      - name: Deps (yum)
+        if: matrix.container == 'quay.io/pypa/manylinux_2_28_x86_64'
         run: |
           yum install -y mesa-libGL dbus-libs unzip
 
-      - name: Install system deps (Fedora — dnf)
+      # Fedora — dnf
+      - name: Deps (dnf)
         if: matrix.container == 'fedora:39'
         run: |
-          dnf install -y python3 python3-pip mesa-libGL dbus-libs \
+          dnf install -y python3 python3-pip binutils mesa-libGL dbus-libs \
             libxkbcommon-x11 xcb-util-cursor xcb-util-wm xcb-util-image \
             xcb-util-keysyms xcb-util-renderutil unzip curl
 
-      - name: Setup Python (native runners only)
+      - name: Setup Python (native)
         if: matrix.container == ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Python dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller
+      # ARM64: PyQt6 уже установлен системно — ставим всё остальное
+      - name: Install Python deps (ARM64)
+        if: matrix.suffix == 'linux-arm64'
+        run: python3 -m pip install yt-dlp imageio-ffmpeg pyinstaller
+
+      # Все остальные Linux
+      - name: Install Python deps
+        if: matrix.suffix != 'linux-arm64'
+        run: python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller
 
       - name: Download Deno
         run: |
           curl -fsSL "${{ matrix.deno_url }}" -o deno.zip
           unzip deno.zip && rm deno.zip && chmod +x deno
 
-      - name: Build GrabWave
+      - name: Build
         run: python3 -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
 
-      - name: Rename binary
+      - name: Rename
         run: mv dist/GrabWave dist/GrabWave-${{ matrix.suffix }}
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: GrabWave-${{ matrix.suffix }}
           path: dist/GrabWave-${{ matrix.suffix }}
@@ -196,19 +193,15 @@ jobs:
     needs: [build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts/
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
           name: "GrabWave ${{ github.ref_name }}"
           body: |
             ## 🌊 GrabWave ${{ github.ref_name }}
-
-            Скачайте версию для вашей операционной системы:
 
             ### 🪟 Windows
             | Файл | Описание |
@@ -225,17 +218,15 @@ jobs:
             | Файл | Дистрибутивы |
             |------|--------------|
             | `GrabWave-linux-ubuntu` | Ubuntu 22.04+, Debian 12+, Mint |
-            | `GrabWave-linux-manylinux` | **Максимальная совместимость** — CentOS 7+, RHEL, Fedora 20+, Amazon Linux 2 |
+            | `GrabWave-linux-manylinux` | CentOS 8+, RHEL 8+, Fedora 28+, Amazon Linux 2023 |
             | `GrabWave-linux-fedora` | Fedora 39+ |
-            | `GrabWave-linux-arm64` | ARM64 — Raspberry Pi 4/5 |
+            | `GrabWave-linux-arm64` | Raspberry Pi 4/5, ARM64 серверы |
 
             ### Запуск на Linux/macOS
             ```bash
             chmod +x GrabWave-*
             ./GrabWave-linux-ubuntu
             ```
-
-            > **Не знаете какой выбрать?** → `GrabWave-linux-manylinux` работает почти везде
           files: |
             artifacts/GrabWave-Windows/GrabWave.exe
             artifacts/GrabWave-mac-intel/GrabWave-mac-intel

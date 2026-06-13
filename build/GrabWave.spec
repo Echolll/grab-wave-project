@@ -2,8 +2,8 @@
 import os
 import sys
 
-# Папка проекта (на уровень выше от build/)
-project_dir = os.path.abspath(os.path.join(os.path.dirname(SPECPATH), '..'))
+# Папка проекта (SPECPATH = директория где лежит spec, т.е. build/)
+project_dir = os.path.abspath(os.path.join(SPECPATH, '..'))
 
 a = Analysis(
     [os.path.join(project_dir, 'main.py')],
