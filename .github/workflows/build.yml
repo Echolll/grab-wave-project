@@ -1,0 +1,255 @@
+name: Build & Release GrabWave
+
+# Запускается когда пушишь тег вида v1.0.0, v1.2.3 и т.д.
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Разрешаем Actions создавать Releases и загружать файлы
+permissions:
+  contents: write
+
+jobs:
+
+  # ─────────────────────────────────────────────
+  #  WINDOWS → GrabWave.exe
+  # ─────────────────────────────────────────────
+  build-windows:
+    name: 🪟 Windows Build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download Deno (Windows)
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-pc-windows-msvc.zip" -OutFile deno.zip
+          Expand-Archive deno.zip -DestinationPath .
+          Remove-Item deno.zip
+        shell: pwsh
+
+      - name: Build GrabWave.exe
+        run: pyinstaller build/GrabWave.spec --distpath dist --workpath build/_work
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrabWave-Windows
+          path: dist/GrabWave.exe
+
+  # ─────────────────────────────────────────────
+  #  macOS → GrabWave (Intel + Apple Silicon)
+  # ─────────────────────────────────────────────
+  build-macos:
+    name: 🍎 macOS Build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: Intel (x86_64)
+            runner: macos-13          # последний Intel runner
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip
+            suffix: mac-intel
+          - arch: Apple Silicon (ARM64)
+            runner: macos-latest      # macos-14+ = ARM
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip
+            suffix: mac-arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download Deno (macOS ${{ matrix.arch }})
+        run: |
+          curl -fsSL "${{ matrix.deno_url }}" -o deno.zip
+          unzip deno.zip && rm deno.zip && chmod +x deno
+
+      - name: Build GrabWave
+        run: pyinstaller build/GrabWave.spec --distpath dist --workpath build/_work
+
+      - name: Rename binary
+        run: mv dist/GrabWave dist/GrabWave-${{ matrix.suffix }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrabWave-${{ matrix.suffix }}
+          path: dist/GrabWave-${{ matrix.suffix }}
+
+  # ─────────────────────────────────────────────
+  #  LINUX — матрица дистрибутивов
+  #
+  #  Стратегия:
+  #   • ubuntu-22.04 runner  → нативная сборка для Debian/Ubuntu/Mint
+  #   • docker: manylinux    → максимальная совместимость (glibc 2.17+)
+  #                            работает на CentOS 7+, RHEL, Fedora, openSUSE
+  #   • docker: alpine       → musl libc (Alpine Linux)
+  #   • ubuntu ARM runner    → ARM64 (Raspberry Pi, серверы)
+  # ─────────────────────────────────────────────
+  build-linux:
+    name: 🐧 Linux Build (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.container }}
+    strategy:
+      fail-fast: false          # остальные дистрибутивы продолжают сборку при ошибке одного
+      matrix:
+        include:
+
+          # ── Ubuntu/Debian/Mint (современные) ──
+          - name: Ubuntu-Debian
+            runner: ubuntu-22.04
+            container: ''
+            suffix: linux-ubuntu
+            pre_install: |
+              sudo apt-get update -qq
+              sudo apt-get install -y libgl1 libglib2.0-0 libdbus-1-3 libxcb-cursor0 \
+                libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+                libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
+
+          # ── Максимальная совместимость: glibc 2.17+ ──
+          # Покрывает: CentOS 7/8, RHEL 7/8, Fedora 20+, openSUSE 13.2+,
+          #            Debian 8+, Ubuntu 14.04+, Amazon Linux 2
+          - name: Manylinux (glibc 2.17+)
+            runner: ubuntu-22.04
+            container: quay.io/pypa/manylinux2014_x86_64  # CentOS 7 base, glibc 2.17
+            suffix: linux-manylinux
+            pre_install: |
+              yum install -y mesa-libGL dbus-libs
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
+
+          # ── Fedora / RPM-based дистрибутивы ──
+          - name: Fedora
+            runner: ubuntu-22.04
+            container: fedora:39
+            suffix: linux-fedora
+            pre_install: |
+              dnf install -y python3 python3-pip mesa-libGL dbus-libs \
+                libxkbcommon-x11 xcb-util-cursor xcb-util-wm xcb-util-image \
+                xcb-util-keysyms xcb-util-renderutil unzip curl
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
+
+          # ── ARM64 (Raspberry Pi 4/5, сервера, Ampere) ──
+          - name: Linux ARM64
+            runner: ubuntu-22.04-arm
+            container: ''
+            suffix: linux-arm64
+            pre_install: |
+              sudo apt-get update -qq
+              sudo apt-get install -y libgl1 libglib2.0-0 libdbus-1-3
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-unknown-linux-gnu.zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pre-install system dependencies
+        run: ${{ matrix.pre_install }}
+
+      - name: Setup Python (non-container runners)
+        if: matrix.container == ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install -r requirements.txt
+          pip3 install pyinstaller
+
+      - name: Download Deno
+        run: |
+          curl -fsSL "${{ matrix.deno_url }}" -o deno.zip
+          unzip deno.zip && rm deno.zip && chmod +x deno
+
+      - name: Build GrabWave
+        run: python3 -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
+
+      - name: Rename binary
+        run: mv dist/GrabWave dist/GrabWave-${{ matrix.suffix }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrabWave-${{ matrix.suffix }}
+          path: dist/GrabWave-${{ matrix.suffix }}
+
+  # ─────────────────────────────────────────────
+  #  RELEASE — собираем все файлы и публикуем
+  # ─────────────────────────────────────────────
+  release:
+    name: 🚀 Publish Release
+    needs: [build-windows, build-macos, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "GrabWave ${{ github.ref_name }}"
+          body: |
+            ## 🌊 GrabWave ${{ github.ref_name }}
+
+            Скачайте версию для вашей операционной системы:
+
+            ### 🪟 Windows
+            | Файл | Описание |
+            |------|----------|
+            | `GrabWave.exe` | Windows 10/11 (64-bit) |
+
+            ### 🍎 macOS
+            | Файл | Описание |
+            |------|----------|
+            | `GrabWave-mac-arm64` | Apple Silicon (M1/M2/M3/M4) |
+            | `GrabWave-mac-intel` | Intel Mac (2019 и старше) |
+
+            ### 🐧 Linux
+            | Файл | Дистрибутивы |
+            |------|--------------|
+            | `GrabWave-linux-ubuntu` | Ubuntu 22.04+, Debian 12+, Linux Mint 21+ |
+            | `GrabWave-linux-manylinux` | **Максимальная совместимость** — CentOS 7+, RHEL, Fedora 20+, openSUSE, Amazon Linux 2, Ubuntu 14.04+ |
+            | `GrabWave-linux-fedora` | Fedora 39+ (нативная сборка) |
+            | `GrabWave-linux-arm64` | ARM64 — Raspberry Pi 4/5, серверы Ampere |
+
+            ### Запуск на Linux/macOS
+            ```bash
+            chmod +x GrabWave-*
+            ./GrabWave-linux-ubuntu  # или нужный вариант
+            ```
+
+            > **Не знаете какой выбрать?** → `GrabWave-linux-manylinux` работает почти везде
+          files: |
+            artifacts/GrabWave-Windows/GrabWave.exe
+            artifacts/GrabWave-mac-intel/GrabWave-mac-intel
+            artifacts/GrabWave-mac-arm64/GrabWave-mac-arm64
+            artifacts/GrabWave-linux-ubuntu/GrabWave-linux-ubuntu
+            artifacts/GrabWave-linux-manylinux/GrabWave-linux-manylinux
+            artifacts/GrabWave-linux-fedora/GrabWave-linux-fedora
+            artifacts/GrabWave-linux-arm64/GrabWave-linux-arm64
+          draft: false
+          prerelease: false

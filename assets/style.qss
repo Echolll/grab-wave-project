@@ -1,0 +1,159 @@
+/* Основной фон и текст */
+QMainWindow, QDialog, QWidget {
+    background-color: #0F172A;
+    color: #F8FAFC;
+    font-family: "Segoe UI", "Inter", sans-serif;
+    font-size: 14px;
+}
+
+/* Поля ввода */
+QLineEdit {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #F8FAFC;
+    selection-background-color: #3B82F6;
+}
+
+QLineEdit:focus {
+    border: 1px solid #3B82F6;
+}
+
+/* Выпадающие списки */
+QComboBox {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #F8FAFC;
+}
+
+QComboBox::drop-down {
+    border: none;
+    padding-right: 10px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    selection-background-color: #3B82F6;
+    color: #F8FAFC;
+}
+
+/* Кнопки */
+QPushButton {
+    background-color: #334155;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    color: #F8FAFC;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #475569;
+}
+
+QPushButton:pressed {
+    background-color: #1E293B;
+}
+
+/* Главная кнопка "Скачать" */
+QPushButton#downloadBtn {
+    background-color: #10B981; /* Изумрудный неоновый */
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 12px 24px;
+    border-radius: 8px;
+}
+
+QPushButton#downloadBtn:hover {
+    background-color: #059669;
+}
+
+QPushButton#downloadBtn:disabled {
+    background-color: #064E3B;
+    color: #9CA3AF;
+}
+
+/* Прогресс-бар */
+QProgressBar {
+    background-color: #1E293B;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    text-align: center;
+    color: #F8FAFC;
+    font-weight: bold;
+}
+
+QProgressBar::chunk {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+                                      stop: 0 #3B82F6, stop: 1 #8B5CF6);
+    border-radius: 5px;
+}
+
+/* Чекбоксы */
+QCheckBox {
+    spacing: 8px;
+}
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+    background-color: #1E293B;
+}
+QCheckBox::indicator:checked {
+    background-color: #3B82F6;
+    border: 1px solid #3B82F6;
+}
+
+/* Текстовые поля (Логи) и Списки (История) */
+QTextEdit, QListWidget {
+    background-color: #0B1120;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    padding: 8px;
+    color: #A7F3D0; /* Зеленоватый текст для логов */
+    font-family: "Consolas", "Courier New", monospace;
+}
+
+QListWidget {
+    color: #F8FAFC;
+    font-family: "Segoe UI", "Inter", sans-serif;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #1E293B;
+}
+
+QListWidget::item:hover {
+    background-color: #1E293B;
+}
+
+QListWidget::item:selected {
+    background-color: #3B82F6;
+}
+
+/* ToolBar */
+QToolBar {
+    background-color: #0F172A;
+    border-bottom: 1px solid #1E293B;
+    spacing: 10px;
+    padding: 5px;
+}
+
+QToolButton {
+    background-color: transparent;
+    color: #94A3B8;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+QToolButton:hover {
+    background-color: #1E293B;
+    color: #F8FAFC;
+}

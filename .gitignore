@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# PyInstaller output
+dist/
+build/_work/
+
+# Large binaries (скачиваются автоматически в CI)
+deno.exe
+deno
+
+# Downloaded videos
+downloads/
+
+# OS
+.DS_Store
+Thumbs.db
