@@ -43,7 +43,7 @@ jobs:
           path: dist/GrabWave.exe
 
   # ─────────────────────────────────────────────
-  #  macOS → Intel + Apple Silicon
+  #  macOS → Apple Silicon (только)
   # ─────────────────────────────────────────────
   build-macos:
     name: 🍎 macOS (${{ matrix.suffix }})
@@ -52,15 +52,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macos-latest = ARM64 (Apple Silicon). Используем его для обеих сборок,
-          # т.к. Python 3.11 там universal2, и PyInstaller может кросс-компилировать под Intel.
-          - runner: macos-latest
-            suffix: mac-intel
-            arch: x86_64
-            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-apple-darwin.zip
           - runner: macos-latest
             suffix: mac-arm64
-            arch: arm64
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-apple-darwin.zip
     steps:
       - uses: actions/checkout@v4
@@ -77,8 +70,6 @@ jobs:
           unzip deno.zip && rm deno.zip && chmod +x deno
 
       - name: Build
-        env:
-          TARGET_ARCH: ${{ matrix.arch }}
         run: pyinstaller build/GrabWave.spec --distpath dist --workpath build/_work
 
       - name: Rename
@@ -100,36 +91,35 @@ jobs:
       fail-fast: false
       matrix:
         include:
-
-          # Ubuntu/Debian/Mint (glibc 2.35+)
+          # Ubuntu
           - runner: ubuntu-22.04
             container: ''
             suffix: linux-ubuntu
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # Manylinux x86_64 (glibc 2.28+)
+          # Debian 12
           - runner: ubuntu-22.04
-            container: quay.io/pypa/manylinux_2_28_x86_64
-            suffix: linux-manylinux
+            container: debian:12
+            suffix: linux-debian
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # Fedora (glibc 2.38+)
+          # Fedora 39
           - runner: ubuntu-22.04
             container: fedora:39
             suffix: linux-fedora
             deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
-          # Manylinux ARM64 (glibc 2.28+)
-          - runner: ubuntu-22.04-arm
-            container: quay.io/pypa/manylinux_2_28_aarch64
-            suffix: linux-arm64
-            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-aarch64-unknown-linux-gnu.zip
+          # Arch Linux
+          - runner: ubuntu-22.04
+            container: archlinux:latest
+            suffix: linux-arch
+            deno_url: https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip
 
     steps:
       - uses: actions/checkout@v4
 
-      # Ubuntu — apt
-      - name: Deps (apt)
+      # Ubuntu
+      - name: Deps (Ubuntu)
         if: matrix.container == ''
         run: |
           sudo apt-get update -qq
@@ -138,52 +128,59 @@ jobs:
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
             libxcb-xinerama0 unzip curl
 
-      # Manylinux (x86_64 & aarch64) — yum
-      - name: Deps (yum)
-        if: contains(matrix.container, 'manylinux')
+      # Debian
+      - name: Deps (Debian)
+        if: matrix.container == 'debian:12'
         run: |
-          yum install -y mesa-libGL dbus-libs unzip
+          apt-get update -qq
+          apt-get install -y libgl1 libglib2.0-0 libdbus-1-3 \
+            libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 \
+            libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 unzip curl python3 python3-pip python3-venv
 
-      # Fedora — dnf
-      - name: Deps (dnf)
+      # Fedora
+      - name: Deps (Fedora)
         if: matrix.container == 'fedora:39'
         run: |
           dnf install -y python3 python3-pip binutils mesa-libGL dbus-libs \
             libxkbcommon-x11 xcb-util-cursor xcb-util-wm xcb-util-image \
             xcb-util-keysyms xcb-util-renderutil unzip curl
 
-      - name: Setup Python (native)
+      # Arch Linux
+      - name: Deps (Arch)
+        if: matrix.container == 'archlinux:latest'
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm python python-pip base-devel mesa dbus libxkbcommon \
+            xcb-util-cursor xcb-util-wm xcb-util-image xcb-util-keysyms xcb-util-renderutil unzip curl
+
+      # Setup Python (Ubuntu only)
+      - name: Setup Python (Ubuntu)
         if: matrix.container == ''
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # Установка зависимостей через Native Python
-      - name: Install Python deps (native)
-        if: matrix.container == '' || matrix.container == 'fedora:39'
-        run: python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller browser-cookie3
-
-      # Установка зависимостей через Manylinux Python 3.11 (включая обновление pip!)
-      - name: Install Python deps (Manylinux)
-        if: contains(matrix.container, 'manylinux')
+      # Install Dependencies (with venv for containers to avoid externally-managed-environment errors)
+      - name: Install Python deps
         run: |
-          /opt/python/cp311-cp311/bin/python -m pip install --upgrade pip
-          /opt/python/cp311-cp311/bin/python -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller browser-cookie3
+          if [ "${{ matrix.container }}" != "" ]; then
+            python3 -m venv venv
+            source venv/bin/activate
+          fi
+          python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller browser-cookie3
 
       - name: Download Deno
         run: |
           curl -fsSL "${{ matrix.deno_url }}" -o deno.zip
           unzip deno.zip && rm deno.zip && chmod +x deno
 
-      # Сборка через Native Python
-      - name: Build (native)
-        if: matrix.container == '' || matrix.container == 'fedora:39'
-        run: python3 -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
-
-      # Сборка через Manylinux Python 3.11
-      - name: Build (Manylinux)
-        if: contains(matrix.container, 'manylinux')
-        run: /opt/python/cp311-cp311/bin/python -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
+      - name: Build
+        run: |
+          if [ "${{ matrix.container }}" != "" ]; then
+            source venv/bin/activate
+          fi
+          python3 -m PyInstaller build/GrabWave.spec --distpath dist --workpath build/_work
 
       - name: Rename
         run: mv dist/GrabWave dist/GrabWave-${{ matrix.suffix }}
