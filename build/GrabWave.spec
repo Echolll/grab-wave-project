@@ -60,7 +60,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch=os.environ.get('TARGET_ARCH', None),
     codesign_identity=None,
     entitlements_file=None,
     icon=os.path.join(project_dir, 'assets', 'icon.ico') if sys.platform == 'win32' else None,
