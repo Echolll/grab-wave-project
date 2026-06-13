@@ -133,11 +133,11 @@ jobs:
             libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 \
             libxcb-xinerama0 unzip curl
 
-      # ARM64: PyQt6 не имеет готовых wheel — ставим из системного репо
+      # ARM64: PyQt6 не имеет готовых wheel на PyPI — ставим из системного репо
       - name: Qt6 for ARM64
         if: matrix.suffix == 'linux-arm64'
         run: |
-          sudo apt-get install -y python3-pyqt6 python3-pyqt6.sip qt6-base-dev
+          sudo apt-get install -y python3-pyqt6 python3-pyqt6.sip qt6-base-dev python3-pip
 
       # Manylinux — yum
       - name: Deps (yum)
@@ -154,17 +154,25 @@ jobs:
             xcb-util-keysyms xcb-util-renderutil unzip curl
 
       - name: Setup Python (native)
-        if: matrix.container == ''
+        if: matrix.container == '' && matrix.suffix != 'linux-arm64'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # ARM64: PyQt6 уже установлен системно — ставим всё остальное
+      # Для manylinux используем встроенный Python 3.11, иначе он попытается использовать системный python 3.6
+      - name: Setup Manylinux Python
+        if: matrix.container == 'quay.io/pypa/manylinux_2_28_x86_64'
+        run: |
+          ln -sf /opt/python/cp311-cp311/bin/python /usr/local/bin/python3
+          ln -sf /opt/python/cp311-cp311/bin/pip /usr/local/bin/pip3
+          ln -sf /opt/python/cp311-cp311/bin/pyinstaller /usr/local/bin/pyinstaller
+
+      # ARM64: системный питон
       - name: Install Python deps (ARM64)
         if: matrix.suffix == 'linux-arm64'
-        run: python3 -m pip install yt-dlp imageio-ffmpeg pyinstaller
+        run: python3 -m pip install yt-dlp imageio-ffmpeg pyinstaller --break-system-packages
 
-      # Все остальные Linux
+      # Остальные
       - name: Install Python deps
         if: matrix.suffix != 'linux-arm64'
         run: python3 -m pip install yt-dlp PyQt6 imageio-ffmpeg pyinstaller
