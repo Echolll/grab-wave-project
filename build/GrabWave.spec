@@ -2,10 +2,8 @@
 import os
 import sys
 
-block_cipher = None
-
 # Папка проекта (на уровень выше от build/)
-project_dir = os.path.abspath(os.path.join(os.path.dirname(SPEC), '..'))
+project_dir = os.path.abspath(os.path.join(os.path.dirname(SPECPATH), '..'))
 
 a = Analysis(
     [os.path.join(project_dir, 'main.py')],
@@ -26,11 +24,9 @@ a = Analysis(
         'browser_cookie3',
     ],
     hookspath=[],
+    hooksconfig={},
     runtime_hooks=[],
     excludes=[],
-    win_no_prefer_redirects=False,
-    win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
@@ -44,13 +40,12 @@ deno_unix = os.path.join(project_dir, 'deno')
 if os.path.exists(deno_unix):
     a.datas += [(deno_unix, '.')]
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
     [],
     name='GrabWave',
@@ -62,6 +57,7 @@ exe = EXE(
     runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
+    argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
