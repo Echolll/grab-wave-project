@@ -1,4 +1,4 @@
-# Universal Video Downloader Pro
+# Grab Wave
 
 Десктопное приложение для скачивания медиаконтента (видео и аудио) с любых платформ: YouTube, VK, RuTube, TikTok, Instagram и сотен других. Построено на базе `yt-dlp` и `PyQt6`.
 
